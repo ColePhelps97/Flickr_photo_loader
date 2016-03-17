@@ -35,6 +35,12 @@ if (not $response->{success}) {
 	die "Something gone wrong";
 }
 
+my $user_name = $argument;
+$user_name =~ s/http.+photos\///;
+$user_name =~ s/\/.*//;
+mkdir $user_name;
+chdir $user_name;
+
 
 open(FILE,"> user_ID")
 	or die "Problem $!";
@@ -62,12 +68,6 @@ close(FILE);
 
 chomp($user_id);
 print("User ID : $user_id \n");
-
-my $user_name = $argument;
-$user_name =~ s/http.+photos\///;
-$user_name =~ s/\/.*//;
-mkdir $user_name;
-chdir $user_name;
 
 my $images_request = Flickr::API::Request->new({
 			method => 'flickr.people.getPublicPhotos', 
