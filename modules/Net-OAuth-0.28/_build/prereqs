@@ -1,0 +1,20 @@
+do{ my $x = {
+       'conflicts' => {},
+       'requires' => {
+                       'Class::Data::Inheritable' => '0.06',
+                       'Class::Accessor' => '0.31',
+                       'Digest::SHA1' => '2.12',
+                       'Digest::SHA' => '5.47',
+                       'LWP::UserAgent' => '1',
+                       'URI::Escape' => '3.28',
+                       'Digest::HMAC_SHA1' => '1.01',
+                       'Encode' => '2.35'
+                     },
+       'build_requires' => {
+                             'Test::Warn' => '0.21',
+                             'Test::More' => '0.66'
+                           },
+       'recommends' => {},
+       'test_requires' => {}
+     };
+$x; }
