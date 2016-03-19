@@ -9,8 +9,8 @@ use Data::Dumper qw(Dumper);
 use Flickr::API::Request;
 
 
-my $argument = shift();
-my $browser = LWP::UserAgent->new;
+my $argument = shift // '';
+my $browser = LWP::UserAgent->new();
 my $source = $browser->get($argument);
 my $image_number = 1;
 my $flickr_api_key = '8f4efdbbbf309931c9a58372edbbf732';
@@ -31,43 +31,27 @@ my $request = Flickr::API::Request->new({
 	});
 
 my $response = $api->execute_request($request);
-if (not $response->{success}) {
-	die "Something gone wrong";
-}
+die "Request failed" unless $response->{success};
 
-my $user_name = $argument;
-$user_name =~ s/http.+photos\///;
-$user_name =~ s/\/.*//;
+$argument =~ m{http.+photos/([^/]+)/.*};
+my $user_name = $1 // '';
 mkdir $user_name;
 chdir $user_name;
 
 
-open(FILE,"> user_ID")
-	or die "Problem $!";
-print(FILE Dumper $response->{tree});
-close(FILE);
+open my $FILE, "+>", "user_ID" or die "Problem $!";
+print $FILE Dumper $response->{tree};
+seek $FILE, 0, 0;
 
-
-my $user_id;
-my $buf_line;
-
-open(FILE,"< user_ID")
-	or die "I have some problems $! \n";
-
-my @strings = <FILE>;
-foreach my $line (@strings) {
-	$buf_line = $line;
-	if($buf_line =~ s/^[ ]*'id' => '//) {
-		$buf_line =~ s/'$//;
-		$user_id = $buf_line;
-		last;
-	}
+while (<$FILE>) {
+	last if $_ =~ m{^\s*'id'\s*=>\s*'([^']*)'};
 }
+my $user_id = $1 // -1;
 
-close(FILE);
+close $FILE;
 
-chomp($user_id);
-print("User ID : $user_id \n");
+chomp $user_id;
+print "User ID : $user_id \n";
 
 my $images_request = Flickr::API::Request->new({
 			method => 'flickr.people.getPublicPhotos', 
@@ -79,20 +63,15 @@ my $images_request = Flickr::API::Request->new({
 		});
 
 my $images_response = $api->execute_request($images_request);
+die "getPublicPhotos request failed" unless $images_response->{success};
 
-if(not $images_response->{success}) { 
-	die "One more problem here $images_response->{error_code}";
-}
+open my $IMAGE_LIST, "+>", "image_list") or die "image_list $!";
+print $IMAGE_LIST Dumper $images_response->{tree};
+seek $IMAGE_LIST, 0, 0;
 
-open(IMAGE_LIST, "> image_list")
-	or die "And one more here $!";
-print(IMAGE_LIST Dumper $images_response->{tree});
-close(IMAGE_LIST);
-
-open(IMAGE_LIST, "< image_list") 
-	or die "And here $!";
-@strings = <IMAGE_LIST>;
-close(IMAGE_LIST);
+@strings = <$IMAGE_LIST>;
+close $IMAGE_LIST;
+/* unreadable below */
 
 my $image_source_response;
 my $farm;
