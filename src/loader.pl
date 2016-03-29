@@ -33,120 +33,67 @@ my $request = Flickr::API::Request->new({
 my $response = $api->execute_request($request);
 die "Request failed" unless $response->{success};
 
-print Dumper $response->{tree}{children}[1]{children}[1]{children}[0]{content};
-my $user_name = $response->{tree}{children}[1]{children}[1]{children}[0]{content};
+
+print Dumper $response->{hash}{user}{username};
+my $user_name = $response->{hash}{user}{username};
 mkdir $user_name;
 chdir $user_name;
 
-
-print Dumper $response->{tree}{children}[1]{attributes}{id};
-my $user_id = $response->{tree}{children}[1]{attributes}{id};
+print Dumper $response->{hash}{user}{id};
+my $user_id = $response->{hash}{user}{id};
 
 print "User ID : $user_id \n";
 
-my $images_request = Flickr::API::Request->new({
-			method => 'flickr.people.getPublicPhotos', 
-			args => { 
-				api_key => $flickr_api_key,
-				user_id => $user_id,
-				per_page => 500
-			}
-		});
 
-my $images_response = $api->execute_request($images_request);
-die "getPublicPhotos request failed" unless $images_response->{success};
-
-open my $IMAGE_LIST, "+>", "image_list" or die "image_list $!";
-print $IMAGE_LIST Dumper $images_response->{tree};
-seek $IMAGE_LIST, 0, 0;
-
-my @strings = <$IMAGE_LIST>;
-close $IMAGE_LIST;
-#/* unreadable below */
-
-my $image_source_response;
-my $farm;
-my $server;
-my $photoID;
-my $secret;
-my $buf_line;
-
-my $farm_ready = 0;
-my $server_ready = 0;
-my $photoID_ready = 0;
-my $secret_ready = 0;
-my $is_attr = 0;
-
-
-foreach my $line (@strings) {
-	$buf_line = $line;
-	if($buf_line =~ /'attributes'/) {
-		$is_attr = 1;
-	}
-		
-	if($is_attr == 1){
-		if($buf_line =~ s/^.*'server' => '// && $server_ready == 0) {
-			if($buf_line =~ s/',$//) {
-				$server = $buf_line;
-				chomp($server);
-				$server_ready = 1;
-			}
+my $total_pages = 1;
+for(my $current_page = 1; $current_page <= $total_pages; $current_page++) {
+	my $images_request = Flickr::API::Request->new({
+		method => 'flickr.people.getPublicPhotos', 
+		args => { 
+			api_key => $flickr_api_key,
+			user_id => $user_id,
+			per_page => 500,
+			page => $current_page
 		}
-		if($buf_line =~ s/^.*'secret' => '// && $secret_ready == 0) {
-			if($buf_line =~ s/',$//) {
-				$secret = $buf_line;
-				chomp($secret);
-				$secret_ready = 1;
-			}
-		}
-		if($buf_line =~ s/^.*'farm' => '// && $farm_ready == 0) {
-			if($buf_line =~ s/',$//) {
-				$farm= $buf_line;
-				chomp($farm);
-				$farm_ready = 1;
-			}
-		}
-		if($buf_line =~ s/^.*'id' => '// && $photoID_ready == 0) {
-			if($buf_line =~ s/',$//) {
-				$photoID= $buf_line;
-				chomp($photoID);
-				$photoID_ready = 1;
-				
-			}
-		}
-		
-	}	
-	if($is_attr == 1 && $server_ready == 1 && $farm_ready == 1 && $photoID_ready == 1 && $secret_ready == 1) {
-			my $url = sprintf("http://farm%s.static.flickr.com/%s/%s_%s.jpg", $farm, $server, $photoID, $secret);
-			print($url);
-			$image_source_response = $browser->get($url);
-
-			open(IMAGE, "> image.jpg")
-				or die "image.jpg problems $!";
-			print(IMAGE $image_source_response->content);
-			close(IMAGE);
-
-			my $image_type = image_type("image.jpg");
-			if($image_type->{file_type} eq 'PNG') {
-				print(" : File not found \n");
-			} else {
-				print(" : OK \n");
-				open(IMAGE, "> image_$image_number.jpg") 
-					or die "I can't open $image_number image $!";
-				print(IMAGE $image_source_response->content);
-				close(IMAGE);
-
-				$image_number++;
-			} 
-			
-			$is_attr = 0;
-			$server_ready = 0;
-			$secret_ready = 0;
-			$farm_ready = 0;
-			$photoID_ready = 0;
-	}		
-}
+	});
 	
-		
+	my $images_response = $api->execute_request($images_request);
+	die "getPublicPhotos request failed" unless $images_response->{success};
 
+	$total_pages = $images_response->{hash}{photos}{pages};
+	
+	for(my $image_number = 0;
+			$image_number < (int($images_response->{hash}{photos}{total} / $images_response->{hash}{photos}{perpage}) != 0 ? 
+			$images_response->{hash}{photos}{perpage} : 
+			$images_response->{hash}{photos}{total} % $images_response->{hash}{photos}{perpage}); 
+			$image_number++) {
+
+
+		my $url = sprintf("http://farm%s.static.flickr.com/%s/%s_%s.jpg", 
+			$images_response->{hash}{photos}{photo}[$image_number]{farm},
+			$images_response->{hash}{photos}{photo}[$image_number]{server},
+			$images_response->{hash}{photos}{photo}[$image_number]{id},
+			$images_response->{hash}{photos}{photo}[$image_number]{secret});
+		
+		my $number = $image_number+$images_response->{hash}{photos}{perpage}*($current_page-1);
+		print("[$number] <-> $url");
+		my $image_source = $browser->get($url);
+
+		open(IMAGE, "> image.jpg")
+			or die "image.jpg problems $!";
+		print(IMAGE $image_source->content);
+		close(IMAGE);
+
+		my $image_type = image_type("image.jpg");
+		if($image_type->{file_type} eq 'PNG') {
+			print(" : File not found \n");
+		} else {
+			print(" : OK \n");
+			open(IMAGE, "> $images_response->{hash}{photos}{photo}[$image_number]{title}.jpg") 
+				or die "I can't open $image_number image $!";
+			print(IMAGE $image_source->content);
+			close(IMAGE);
+		} 
+	}
+}
 
