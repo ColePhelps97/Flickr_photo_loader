@@ -33,24 +33,15 @@ my $request = Flickr::API::Request->new({
 my $response = $api->execute_request($request);
 die "Request failed" unless $response->{success};
 
-$argument =~ m{http.+photos/([^/]+)/.*};
-my $user_name = $1 // '';
+print Dumper $response->{tree}{children}[1]{children}[1]{children}[0]{content};
+my $user_name = $response->{tree}{children}[1]{children}[1]{children}[0]{content};
 mkdir $user_name;
 chdir $user_name;
 
 
-open my $FILE, "+>", "user_ID" or die "Problem $!";
-print $FILE Dumper $response->{tree};
-seek $FILE, 0, 0;
+print Dumper $response->{tree}{children}[1]{attributes}{id};
+my $user_id = $response->{tree}{children}[1]{attributes}{id};
 
-while (<$FILE>) {
-	last if $_ =~ m{^\s*'id'\s*=>\s*'([^']*)'};
-}
-my $user_id = $1 // -1;
-
-close $FILE;
-
-chomp $user_id;
 print "User ID : $user_id \n";
 
 my $images_request = Flickr::API::Request->new({
@@ -65,19 +56,20 @@ my $images_request = Flickr::API::Request->new({
 my $images_response = $api->execute_request($images_request);
 die "getPublicPhotos request failed" unless $images_response->{success};
 
-open my $IMAGE_LIST, "+>", "image_list") or die "image_list $!";
+open my $IMAGE_LIST, "+>", "image_list" or die "image_list $!";
 print $IMAGE_LIST Dumper $images_response->{tree};
 seek $IMAGE_LIST, 0, 0;
 
-@strings = <$IMAGE_LIST>;
+my @strings = <$IMAGE_LIST>;
 close $IMAGE_LIST;
-/* unreadable below */
+#/* unreadable below */
 
 my $image_source_response;
 my $farm;
 my $server;
 my $photoID;
 my $secret;
+my $buf_line;
 
 my $farm_ready = 0;
 my $server_ready = 0;
