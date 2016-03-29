@@ -34,12 +34,10 @@ my $response = $api->execute_request($request);
 die "Request failed" unless $response->{success};
 
 
-print Dumper $response->{hash}{user}{username};
 my $user_name = $response->{hash}{user}{username};
 mkdir $user_name;
 chdir $user_name;
 
-print Dumper $response->{hash}{user}{id};
 my $user_id = $response->{hash}{user}{id};
 
 print "User ID : $user_id \n";
@@ -63,7 +61,8 @@ for(my $current_page = 1; $current_page <= $total_pages; $current_page++) {
 	$total_pages = $images_response->{hash}{photos}{pages};
 	
 	for(my $image_number = 0;
-			$image_number < (int($images_response->{hash}{photos}{total} / $images_response->{hash}{photos}{perpage}) != 0 ? 
+			$image_number < (int($images_response->{hash}{photos}{total} - $current_page*$images_response->{hash}{photos}{perpage} /
+			$images_response->{hash}{photos}{perpage}) != 0 ? 
 			$images_response->{hash}{photos}{perpage} : 
 			$images_response->{hash}{photos}{total} % $images_response->{hash}{photos}{perpage}); 
 			$image_number++) {
